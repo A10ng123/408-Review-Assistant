@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/

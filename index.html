@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>408 考研复习助手</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <header class="topnav">
+    <h1 class="topnav-title">408 考研复习助手</h1>
+    <nav class="topnav-tabs">
+      <button class="topnav-tab active" data-tab="dashboard">仪表盘</button>
+      <button class="topnav-tab" data-tab="browse">知识点浏览</button>
+      <button class="topnav-tab" data-tab="stats">统计</button>
+    </nav>
+  </header>
+
+  <!-- 视图容器 -->
+  <main class="main-content">
+    <!-- 仪表盘视图 -->
+    <section id="view-dashboard" class="view active">
+      <div class="dashboard">
+        <div class="dash-summary" id="dash-summary">
+          <!-- JS 动态渲染 -->
+        </div>
+        <div class="dash-queue" id="dash-queue">
+          <!-- JS 动态渲染 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 知识点浏览视图 -->
+    <section id="view-browse" class="view">
+      <!-- 左侧：知识点树 -->
+      <aside class="browse-sidebar">
+        <div class="browse-tree" id="knowledge-tree">
+          <!-- 由 JS 动态渲染 -->
+        </div>
+      </aside>
+      <!-- 右侧：知识点详情 -->
+      <div class="browse-detail" id="point-detail">
+        <p class="placeholder-text">← 左侧选择一个知识点查看详情</p>
+      </div>
+    </section>
+
+    <!-- 统计视图 -->
+    <section id="view-stats" class="view">
+      <div class="stats-container" id="stats-container">
+        <!-- JS 动态渲染 -->
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部状态栏 -->
+  <footer class="statusbar">
+    <span id="status-text">就绪</span>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/sm2.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
