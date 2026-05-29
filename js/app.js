@@ -8,6 +8,8 @@ const App = {
   subjects: [],
   pointsMap: {},
   selectedPointId: null,
+  lastRatingSnapshot: null,  // 撤销用：{ pointId, mastery, sm2, reviewHistoryLen, undoId }
+  undoTimers: {},            // pointId → timerId
 
   /** 初始化应用 */
   init() {
@@ -16,6 +18,7 @@ const App = {
     this.pointsMap = data.pointsMap;
 
     this.bindTabs();
+    this.bindSearch();
     this.renderTree();
     this.renderDashboard();
     this.updateGlobalStats();
@@ -44,6 +47,133 @@ const App = {
 
     if (tabName === 'dashboard') this.renderDashboard();
     if (tabName === 'stats') this.renderStats();
+  },
+
+  /* ========== 搜索 ========== */
+
+  bindSearch() {
+    const input = document.getElementById('search-input');
+    const clearBtn = document.getElementById('search-clear');
+    if (!input || !clearBtn) return;
+
+    // debounce 搜索
+    let timer;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const keyword = input.value.trim();
+        this.filterTree(keyword);
+        clearBtn.style.display = keyword ? 'block' : 'none';
+      }, 100);
+    });
+
+    // 清空按钮
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      this.filterTree('');
+      clearBtn.style.display = 'none';
+    });
+
+    // Esc 清空
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        input.value = '';
+        this.filterTree('');
+        clearBtn.style.display = 'none';
+      }
+    });
+  },
+
+  /** 根据关键词过滤知识点树 */
+  filterTree(keyword) {
+    const tree = document.getElementById('knowledge-tree');
+    if (!tree) return;
+
+    // 先清除所有高亮
+    this.clearHighlights();
+    // 显示所有节点
+    tree.querySelectorAll('.tree-point, .tree-section, .tree-chapter, .tree-subject, [id^="children-"]').forEach(el => {
+      el.style.display = '';
+    });
+
+    if (!keyword) {
+      // 恢复折叠状态
+      tree.querySelectorAll('[id^="children-"]').forEach(el => { el.style.display = 'none'; });
+      tree.querySelectorAll('.tree-arrow').forEach(el => { el.classList.remove('expanded'); });
+      return;
+    }
+
+    const lowerKw = keyword.toLowerCase();
+    let matchCount = 0;
+
+    // 遍历所有知识点
+    tree.querySelectorAll('.tree-point').forEach(point => {
+      const name = point.dataset.name || '';
+      if (name.toLowerCase().includes(lowerKw)) {
+        // 匹配：显示知识点并高亮
+        point.style.display = '';
+        this.highlightText(point, name, keyword);
+        // 展开所有祖先
+        this.expandAncestors(point);
+        matchCount++;
+      } else {
+        // 不匹配：隐藏
+        point.style.display = 'none';
+      }
+    });
+
+    // 隐藏没有可见子节点的 section/chapter/subject 容器
+    tree.querySelectorAll('[id^="children-"]').forEach(container => {
+      const hasVisible = container.querySelectorAll('.tree-point:not([style*="display: none"])').length > 0;
+      if (!hasVisible) {
+        container.style.display = 'none';
+        // 同时隐藏该容器对应的标题的箭头
+        const parentId = container.id.replace('children-', '');
+        const arrow = document.getElementById(`arrow-${parentId}`);
+        if (arrow) arrow.classList.remove('expanded');
+      }
+    });
+  },
+
+  /** 展开知识点的所有祖先节点 */
+  expandAncestors(point) {
+    let parent = point.parentElement;
+    while (parent) {
+      if (parent.id && parent.id.startsWith('children-')) {
+        parent.style.display = 'block';
+        // 展开对应的箭头
+        const nodeId = parent.id.replace('children-', '');
+        const arrow = document.getElementById(`arrow-${nodeId}`);
+        if (arrow) arrow.classList.add('expanded');
+      }
+      parent = parent.parentElement;
+    }
+  },
+
+  /** 在知识点元素中高亮匹配文字 */
+  highlightText(pointEl, name, keyword) {
+    const lowerName = name.toLowerCase();
+    const lowerKw = keyword.toLowerCase();
+    const idx = lowerName.indexOf(lowerKw);
+    if (idx === -1) return;
+
+    const before = name.slice(0, idx);
+    const match = name.slice(idx, idx + keyword.length);
+    const after = name.slice(idx + keyword.length);
+
+    const nameSpan = pointEl.querySelector('.point-name');
+    if (nameSpan) {
+      nameSpan.innerHTML = `${before}<span class="search-highlight">${match}</span>${after}`;
+    }
+  },
+
+  /** 清除所有搜索高亮 */
+  clearHighlights() {
+    document.querySelectorAll('.point-name').forEach(span => {
+      // 获取纯文本（去掉 highlight 标签）
+      const text = span.textContent;
+      if (text) span.textContent = text;
+    });
   },
 
   /* ========== 仪表盘 ========== */
@@ -177,8 +307,9 @@ const App = {
           html += `<div id="children-${section.id}" style="display:none">`;
 
           section.points.forEach(point => {
-            html += `<div class="tree-point" data-action="select" data-point="${point.id}" id="tree-point-${point.id}">
-              <span class="mastery-dot m-${point.mastery}"></span>${point.name}
+            const noteIcon = (point.description && point.description.trim()) ? '<span class="note-indicator" title="有笔记"></span>' : '';
+            html += `<div class="tree-point" data-action="select" data-point="${point.id}" data-name="${point.name.replace(/"/g, '&quot;')}" id="tree-point-${point.id}">
+              <span class="mastery-dot m-${point.mastery}"></span><span class="point-name">${point.name}</span>${noteIcon}
             </div>`;
           });
 
@@ -281,9 +412,22 @@ const App = {
       html += `<div class="review-info">尚未复习过此知识点</div>`;
     }
 
+    // 笔记区域
+    const hasNote = point.description && point.description.trim();
+    html += `<div class="note-area">`;
+    html += `<div class="note-header">📝 笔记</div>`;
+    if (hasNote) {
+      html += `<textarea class="note-textarea" id="note-editor" data-point="${pointId}" placeholder="输入笔记内容...">${point.description}</textarea>`;
+      html += `<div class="note-saved" id="note-saved-msg"></div>`;
+    } else {
+      html += `<div class="note-placeholder" id="note-placeholder" data-point="${pointId}">点击此处添加笔记</div>`;
+    }
+    html += `</div>`;
+
     html += `</div>`;
     container.innerHTML = html;
 
+    // 绑定自评按钮
     container.querySelectorAll('.rating-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const rating = parseInt(btn.dataset.rating);
@@ -291,12 +435,34 @@ const App = {
         this.ratePoint(pid, rating);
       });
     });
+
+    // 绑定笔记事件
+    const textarea = container.querySelector('#note-editor');
+    if (textarea) {
+      textarea.addEventListener('blur', () => {
+        this.saveNote(pointId, textarea.value);
+      });
+    }
+    const placeholder = container.querySelector('#note-placeholder');
+    if (placeholder) {
+      placeholder.addEventListener('click', () => {
+        this.startEditNote(pointId, placeholder);
+      });
+    }
   },
 
   /** 知识点自评（使用 SM-2 算法计算间隔） */
   ratePoint(pointId, rating) {
     const point = this.pointsMap[pointId];
     if (!point) return;
+
+    // 保存撤销快照
+    this.lastRatingSnapshot = {
+      pointId,
+      mastery: point.mastery,
+      sm2: JSON.parse(JSON.stringify(point.sm2)),
+      reviewHistoryLen: point.reviewHistory.length
+    };
 
     const now = new Date().toISOString();
 
@@ -317,10 +483,164 @@ const App = {
     this.updatePointTreeDot(pointId);
     this.updateGlobalStats();
 
+    // 显示撤销提示
+    this.showUndoToast(pointId);
+
     // 如果在仪表盘，也刷新仪表盘
     if (this.currentTab === 'dashboard') {
       this.renderDashboard();
     }
+  },
+
+  /** 显示撤销提示条 */
+  showUndoToast(pointId) {
+    // 清除之前的撤销定时器
+    if (this.undoTimers[pointId]) {
+      clearTimeout(this.undoTimers[pointId]);
+    }
+
+    const detailEl = document.getElementById('point-detail');
+    if (detailEl) {
+      const card = detailEl.querySelector('.detail-card');
+      const existingToast = card ? card.querySelector('.undo-toast') : null;
+      if (existingToast) existingToast.remove();
+
+      if (card) {
+        const toast = document.createElement('div');
+        toast.className = 'undo-toast';
+        toast.innerHTML = `
+          <span class="undo-toast-text">✅ 已评价</span>
+          <button class="undo-toast-btn">撤销</button>
+        `;
+        card.insertBefore(toast, card.firstChild);
+
+        toast.querySelector('.undo-toast-btn').addEventListener('click', () => {
+          this.undoLastRating(pointId);
+        });
+      }
+    }
+
+    // 仪表盘中也插入撤销按钮
+    const dashCard = document.getElementById(`review-card-${pointId}`);
+    if (dashCard) {
+      const infoEl = dashCard.querySelector('.review-card-info');
+      const existingDashToast = dashCard.querySelector('.undo-toast');
+      if (existingDashToast) existingDashToast.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'undo-toast';
+      toast.innerHTML = `<span class="undo-toast-text">✅ 已评价</span><button class="undo-toast-btn">撤销</button>`;
+      infoEl.appendChild(toast);
+
+      toast.querySelector('.undo-toast-btn').addEventListener('click', () => {
+        this.undoLastRating(pointId);
+      });
+    }
+
+    // 3 秒后自动清除
+    this.undoTimers[pointId] = setTimeout(() => {
+      this.clearUndoToast(pointId);
+    }, 3000);
+  },
+
+  /** 撤销最近一次自评 */
+  undoLastRating(pointId) {
+    const snapshot = this.lastRatingSnapshot;
+    if (!snapshot || snapshot.pointId !== pointId) return;
+
+    const point = this.pointsMap[pointId];
+    if (!point) return;
+
+    // 恢复状态
+    point.mastery = snapshot.mastery;
+    point.sm2 = snapshot.sm2;
+    point.reviewHistory = point.reviewHistory.slice(0, snapshot.reviewHistoryLen);
+
+    // 保存
+    Storage.saveUserData(this.pointsMap);
+
+    // 清理撤销状态
+    this.clearUndoToast(pointId);
+    this.lastRatingSnapshot = null;
+
+    // 刷新界面
+    this.renderDetail(pointId);
+    this.updatePointTreeDot(pointId);
+    this.updateGlobalStats();
+    if (this.currentTab === 'dashboard') {
+      this.renderDashboard();
+    }
+  },
+
+  /** 清除撤销提示 UI */
+  clearUndoToast(pointId) {
+    if (this.undoTimers[pointId]) {
+      clearTimeout(this.undoTimers[pointId]);
+      delete this.undoTimers[pointId];
+    }
+
+    // 清除详情面板中的 toast
+    const detailEl = document.getElementById('point-detail');
+    if (detailEl) {
+      const toast = detailEl.querySelector('.undo-toast');
+      if (toast) toast.remove();
+    }
+
+    // 清除仪表盘中的 toast
+    const dashCard = document.getElementById(`review-card-${pointId}`);
+    if (dashCard) {
+      const toast = dashCard.querySelector('.undo-toast');
+      if (toast) toast.remove();
+    }
+  },
+
+  /** 保存知识点笔记 */
+  saveNote(pointId, content) {
+    const point = this.pointsMap[pointId];
+    if (!point) return;
+
+    const trimmed = content.trim();
+    point.description = trimmed;
+    Storage.saveUserData(this.pointsMap);
+
+    // 更新树中的笔记标记
+    const treeEl = document.getElementById(`tree-point-${pointId}`);
+    if (treeEl) {
+      const existing = treeEl.querySelector('.note-indicator');
+      if (trimmed) {
+        if (!existing) {
+          const noteIcon = document.createElement('span');
+          noteIcon.className = 'note-indicator';
+          noteIcon.title = '有笔记';
+          treeEl.appendChild(noteIcon);
+        }
+      } else {
+        if (existing) existing.remove();
+      }
+    }
+
+    // 显示保存提示
+    const msg = document.getElementById('note-saved-msg');
+    if (msg) { msg.textContent = '✓ 已自动保存'; setTimeout(() => { msg.textContent = ''; }, 1500); }
+  },
+
+  /** 从空状态切换到编辑模式 */
+  startEditNote(pointId, placeholder) {
+    const point = this.pointsMap[pointId];
+    if (!point) return;
+
+    const noteArea = placeholder.parentElement;
+    noteArea.innerHTML = `
+      <div class="note-header">📝 笔记</div>
+      <textarea class="note-textarea" id="note-editor" data-point="${pointId}" placeholder="输入笔记内容...">${point.description || ''}</textarea>
+      <div class="note-saved" id="note-saved-msg"></div>
+    `;
+
+    const textarea = noteArea.querySelector('#note-editor');
+    textarea.focus();
+    textarea.addEventListener('blur', () => {
+      this.saveNote(pointId, textarea.value);
+    });
   },
 
   updatePointTreeDot(pointId) {
