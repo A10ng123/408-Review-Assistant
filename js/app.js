@@ -47,6 +47,7 @@ const App = {
 
     if (tabName === 'dashboard') this.renderDashboard();
     if (tabName === 'stats') this.renderStats();
+    if (tabName === 'mindmap') MindMap.init();
   },
 
   /* ========== 搜索 ========== */

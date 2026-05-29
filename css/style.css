@@ -793,6 +793,312 @@ html, body {
   color: var(--color-text-secondary);
 }
 
+/* --- 思维导图视图 --- */
+#view-mindmap {
+  display: none;
+  padding: 0;
+  height: 100%;
+}
+
+#view-mindmap.active {
+  display: flex;
+}
+
+.mindmap-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #FAFBFC;
+}
+
+/* 科目切换栏 */
+.mindmap-subjects {
+  display: flex;
+  gap: 0;
+  padding: 8px 16px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.mindmap-subj-btn {
+  padding: 6px 18px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: all 0.15s;
+}
+
+.mindmap-subj-btn:first-child { border-radius: 6px 0 0 6px; }
+.mindmap-subj-btn:last-child { border-radius: 0 6px 6px 0; }
+.mindmap-subj-btn + .mindmap-subj-btn { border-left: none; }
+
+.mindmap-subj-btn:hover {
+  background: var(--color-primary-light);
+}
+
+.mindmap-subj-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* 画布区域 */
+.mindmap-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.mindmap-canvas-wrapper:active {
+  cursor: grabbing;
+}
+
+.mindmap-canvas-wrapper.dragging-node {
+  cursor: grabbing;
+}
+
+.mindmap-svg {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.mindmap-svg .mm-line {
+  fill: none;
+  stroke: #C0C8D0;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.mindmap-canvas {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+/* 节点 */
+.mm-node {
+  position: absolute;
+  padding: 8px 16px;
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: box-shadow 0.15s;
+  font-family: var(--font-family);
+}
+
+.mm-node:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.2);
+}
+
+.mm-node.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.2);
+}
+
+.mm-node.dragging {
+  opacity: 0.8;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.mm-node.has-link {
+  border-color: var(--color-warning);
+}
+
+.mm-node .mm-link-icon {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--color-warning);
+  cursor: pointer;
+}
+
+.mm-node .mm-link-icon:hover {
+  color: var(--color-caution);
+}
+
+/* 节点编辑输入框 */
+.mm-node-edit {
+  position: absolute;
+  z-index: 20;
+}
+
+.mm-node-edit input {
+  padding: 6px 12px;
+  border: 2px solid var(--color-primary);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-family);
+  outline: none;
+  min-width: 120px;
+}
+
+/* 右键菜单 */
+.mm-context-menu {
+  position: fixed;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  z-index: 100;
+  min-width: 140px;
+}
+
+.mm-menu-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mm-menu-item:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.mm-menu-item.danger {
+  color: var(--color-danger);
+}
+
+.mm-menu-item.danger:hover {
+  background: var(--color-danger-light);
+}
+
+.mm-menu-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+/* 工具栏 */
+.mindmap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.mm-tool-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-card);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: all 0.15s;
+}
+
+.mm-tool-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mm-tool-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}
+
+/* 关联知识点面板 */
+.mm-link-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 50;
+  padding: 12px;
+}
+
+.mm-link-panel-header {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.mm-link-current {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: var(--color-bg);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mm-link-remove {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 2px 4px;
+}
+
+.mm-link-remove:hover { color: var(--color-danger); }
+
+.mm-link-search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-family);
+  outline: none;
+  margin-bottom: 4px;
+}
+
+.mm-link-search:focus { border-color: var(--color-primary); }
+
+.mm-link-results {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.mm-link-result-item {
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.mm-link-result-item:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.mm-link-noresult {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 /* --- 通用工具类 --- */
 .card {
   background: var(--color-card);

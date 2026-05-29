@@ -14,6 +14,7 @@
       <button class="topnav-tab active" data-tab="dashboard">仪表盘</button>
       <button class="topnav-tab" data-tab="browse">知识点浏览</button>
       <button class="topnav-tab" data-tab="stats">统计</button>
+      <button class="topnav-tab" data-tab="mindmap">思维导图</button>
     </nav>
   </header>
 
@@ -55,6 +56,32 @@
         <!-- JS 动态渲染 -->
       </div>
     </section>
+
+    <!-- 思维导图视图 -->
+    <section id="view-mindmap" class="view">
+      <div class="mindmap-container">
+        <!-- 科目切换栏 -->
+        <div class="mindmap-subjects">
+          <button class="mindmap-subj-btn active" data-subj="ds">数据结构</button>
+          <button class="mindmap-subj-btn" data-subj="co">计组</button>
+          <button class="mindmap-subj-btn" data-subj="os">操作系统</button>
+          <button class="mindmap-subj-btn" data-subj="cn">计网</button>
+        </div>
+        <!-- 画布区域 -->
+        <div class="mindmap-canvas-wrapper">
+          <svg class="mindmap-svg" id="mindmap-svg"></svg>
+          <div class="mindmap-canvas" id="mindmap-canvas">
+            <!-- 节点由 JS 动态渲染 -->
+          </div>
+        </div>
+        <!-- 底部工具栏 -->
+        <div class="mindmap-toolbar">
+          <button id="mm-add-root" class="mm-tool-btn">+ 添加根节点</button>
+          <button id="mm-reset-view" class="mm-tool-btn">重置视图</button>
+          <span class="mm-tool-hint">双击空白添加节点 · 拖拽移动 · 滚轮缩放 · 右键菜单</span>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- 底部状态栏 -->
@@ -65,6 +92,7 @@
   <script src="js/data.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/sm2.js"></script>
+  <script src="js/mindmap.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

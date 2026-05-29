@@ -79,6 +79,32 @@ const Storage = {
     }
   },
 
+  /* ========== 思维导图数据 ========== */
+
+  MINDMAP_KEY: 'kr_mindmaps',
+
+  /** 加载所有思维导图数据 */
+  loadMindmapData() {
+    try {
+      const raw = localStorage.getItem(this.MINDMAP_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      console.warn('加载思维导图数据失败', e);
+      return {};
+    }
+  },
+
+  /** 保存一个科目的思维导图 */
+  saveMindmapData(subjectId, nodes) {
+    const data = this.loadMindmapData();
+    data[subjectId] = { nodes };
+    try {
+      localStorage.setItem(this.MINDMAP_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('保存思维导图失败', e);
+    }
+  },
+
   /** 导出一个知识点的用户数据 */
   exportPointData(point) {
     return {
