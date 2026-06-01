@@ -19,11 +19,47 @@
   --color-text: #1A1A2E;
   --color-text-secondary: #8C8C8C;
   --color-border: #E8E8E8;
+  --color-highlight: #FFE066;
+  --color-undo-bg: #E6F7E6;
+  --color-canvas-bg: #FAFBFC;
+  --color-line: #C0C8D0;
+  --color-white-text: #ffffff;
+  --color-shadow-primary: rgba(74, 144, 217, 0.2);
+  --color-shadow-heavy: rgba(0, 0, 0, 0.15);
+  --heat-l1: #C6E48B;
+  --heat-l2: #7BC96F;
+  --heat-l3: #40A140;
+  --heat-l4: #216E39;
 
   --nav-height: 56px;
   --statusbar-height: 32px;
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+/* --- 深色主题变量覆盖 --- */
+[data-theme="dark"] {
+  --color-bg: #1A1A2E;
+  --color-card: #252540;
+  --color-text: #E4E4E8;
+  --color-text-secondary: #A0A0B0;
+  --color-border: #3A3A55;
+  --color-primary-light: #1E3050;
+  --color-success-light: #1A3020;
+  --color-warning-light: #302A10;
+  --color-caution-light: #302510;
+  --color-danger-light: #301A18;
+  --color-highlight: #8B7A20;
+  --color-undo-bg: #1A3020;
+  --color-canvas-bg: #1E1E35;
+  --color-line: #4A4A6A;
+  --color-white-text: #E4E4E8;
+  --color-shadow-primary: rgba(74, 144, 217, 0.35);
+  --color-shadow-heavy: rgba(0, 0, 0, 0.5);
+  --heat-l1: #1E3A10;
+  --heat-l2: #2A5A1A;
+  --heat-l3: #3A7A28;
+  --heat-l4: #4A9A38;
 }
 
 /* --- 基础重置 --- */
@@ -86,7 +122,23 @@ html, body {
 
 .topnav-tab.active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white-text);
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  line-height: 1;
+}
+
+.theme-toggle:hover {
+  background: var(--color-bg);
 }
 
 /* --- 主内容区 --- */
@@ -201,7 +253,7 @@ html, body {
 
 /* 搜索高亮 */
 .search-highlight {
-  background: #FFE066;
+  background: var(--color-highlight);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -285,7 +337,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: #E6F7E6;
+  background: var(--color-undo-bg);
   border: 1px solid var(--color-success);
   border-radius: 8px;
   margin-bottom: 16px;
@@ -315,7 +367,7 @@ html, body {
 
 .undo-toast-btn:hover {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white-text);
 }
 
 /* 仪表盘中的撤销提示 */
@@ -492,7 +544,7 @@ html, body {
 .rating-btn.selected-r2,
 .rating-btn.selected-r3,
 .rating-btn.selected-r4 {
-  color: #fff;
+  color: var(--color-white-text);
   border-color: transparent;
 }
 
@@ -793,6 +845,135 @@ html, body {
   color: var(--color-text-secondary);
 }
 
+/* --- 复习热力图 --- */
+.heatmap-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.heatmap-body {
+  display: flex;
+  gap: 0;
+  min-width: fit-content;
+}
+
+/* 左侧星期标签 */
+.heatmap-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 14px);
+  gap: 3px;
+  margin-right: 6px;
+  padding-top: 20px; /* 对齐月份高度 */
+  flex-shrink: 0;
+}
+
+.heatmap-weekday {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  line-height: 14px;
+  text-align: right;
+  width: 24px;
+}
+
+/* 右侧图表区 */
+.heatmap-chart-area {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 月份标签行 */
+.heatmap-months {
+  display: flex;
+  height: 20px;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  position: relative;
+}
+
+.heatmap-month-label {
+  position: absolute;
+  top: 0;
+}
+
+/* 热力图 Grid：7 行，列自动 */
+.heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 14px);
+  grid-auto-flow: column;
+  grid-auto-columns: 14px;
+  gap: 3px;
+}
+
+/* 单元格 */
+.heatmap-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  outline: none;
+  position: relative;
+}
+
+/* 色阶定义 */
+.heatmap-cell.l-0 { background: var(--color-bg); outline: 1px solid var(--color-border); }
+.heatmap-cell.l-1 { background: var(--heat-l1); }
+.heatmap-cell.l-2 { background: var(--heat-l2); }
+.heatmap-cell.l-3 { background: var(--heat-l3); }
+.heatmap-cell.l-4 { background: var(--heat-l4); }
+
+/* 单元格悬停 */
+.heatmap-cell:hover {
+  outline: 2px solid var(--color-text);
+  z-index: 2;
+}
+
+/* tooltip */
+.heatmap-cell[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text);
+  color: var(--color-card);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 图例 */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.heatmap-legend-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.heatmap-legend-cell.l-0 { background: var(--color-bg); outline: 1px solid var(--color-border); }
+.heatmap-legend-cell.l-1 { background: var(--heat-l1); }
+.heatmap-legend-cell.l-2 { background: var(--heat-l2); }
+.heatmap-legend-cell.l-3 { background: var(--heat-l3); }
+.heatmap-legend-cell.l-4 { background: var(--heat-l4); }
+
+/* 空状态 */
+.heatmap-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: 32px 0;
+  font-size: 13px;
+}
+
 /* --- 思维导图视图 --- */
 #view-mindmap {
   display: none;
@@ -809,7 +990,7 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #FAFBFC;
+  background: var(--color-canvas-bg);
 }
 
 /* 科目切换栏 */
@@ -842,7 +1023,7 @@ html, body {
 
 .mindmap-subj-btn.active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-white-text);
   border-color: var(--color-primary);
 }
 
@@ -873,7 +1054,7 @@ html, body {
 
 .mindmap-svg .mm-line {
   fill: none;
-  stroke: #C0C8D0;
+  stroke: var(--color-line);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
@@ -902,17 +1083,17 @@ html, body {
 
 .mm-node:hover {
   border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.2);
+  box-shadow: 0 2px 8px var(--color-shadow-primary);
 }
 
 .mm-node.selected {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.2);
+  box-shadow: 0 0 0 3px var(--color-shadow-primary);
 }
 
 .mm-node.dragging {
   opacity: 0.8;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px var(--color-shadow-heavy);
   z-index: 10;
 }
 
@@ -954,7 +1135,7 @@ html, body {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px var(--color-shadow-heavy);
   padding: 4px 0;
   z-index: 100;
   min-width: 140px;
@@ -1031,7 +1212,7 @@ html, body {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px var(--color-shadow-heavy);
   z-index: 50;
   padding: 12px;
 }
@@ -1097,6 +1278,33 @@ html, body {
   text-align: center;
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+/* --- 数据导入/导出工具栏 --- */
+.data-toolbar {
+  position: fixed;
+  bottom: calc(var(--statusbar-height) + 16px);
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 80;
+}
+
+.data-tool-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  box-shadow: 0 2px 8px var(--color-shadow-heavy);
+  transition: all 0.15s;
+}
+
+.data-tool-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* --- 通用工具类 --- */

@@ -17,12 +17,86 @@ const App = {
     this.subjects = data.subjects;
     this.pointsMap = data.pointsMap;
 
+    this.initTheme();
     this.bindTabs();
     this.bindSearch();
+    this.bindDataTools();
     this.renderTree();
     this.renderDashboard();
     this.updateGlobalStats();
     console.log('408 考研复习助手 — 初始化完成');
+  },
+
+  /* ========== 主题切换 ========== */
+
+  /** 初始化主题：读取用户偏好，无偏好则跟随系统 */
+  initTheme() {
+    const html = document.documentElement;
+    const toggleBtn = document.getElementById('theme-toggle');
+    if (!toggleBtn) return;
+
+    // 读取保存的主题偏好
+    let theme;
+    try {
+      const raw = localStorage.getItem(Storage.SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      theme = settings.theme;
+    } catch (e) {
+      theme = null;
+    }
+
+    // 无偏好时检测系统主题
+    if (!theme) {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    // 应用主题
+    if (theme === 'dark') {
+      html.setAttribute('data-theme', 'dark');
+      toggleBtn.textContent = '☀️';
+    }
+
+    // 监听系统主题变化（当用户未手动设置时）
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      const current = this.getSavedTheme();
+      if (!current) {
+        html.setAttribute('data-theme', e.matches ? 'dark' : '');
+        toggleBtn.textContent = e.matches ? '☀️' : '🌙';
+        if (!e.matches) html.removeAttribute('data-theme');
+      }
+    });
+
+    // 切换按钮事件
+    toggleBtn.addEventListener('click', () => {
+      const isDark = html.hasAttribute('data-theme');
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        toggleBtn.textContent = '🌙';
+        this.saveTheme('light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        toggleBtn.textContent = '☀️';
+        this.saveTheme('dark');
+      }
+    });
+  },
+
+  /** 获取保存的主题偏好 */
+  getSavedTheme() {
+    try {
+      const raw = localStorage.getItem(Storage.SETTINGS_KEY);
+      return raw ? JSON.parse(raw).theme || null : null;
+    } catch (e) { return null; }
+  },
+
+  /** 保存主题偏好 */
+  saveTheme(theme) {
+    try {
+      const raw = localStorage.getItem(Storage.SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      settings.theme = theme;
+      localStorage.setItem(Storage.SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) { console.warn('保存主题设置失败', e); }
   },
 
   /* ========== 导航切换 ========== */
@@ -175,6 +249,69 @@ const App = {
       const text = span.textContent;
       if (text) span.textContent = text;
     });
+  },
+
+  /* ========== 数据导入/导出 ========== */
+
+  bindDataTools() {
+    const exportBtn = document.getElementById('btn-export');
+    const importBtn = document.getElementById('btn-import');
+    const fileInput = document.getElementById('import-file');
+
+    // 导出数据
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        Storage.exportAll();
+        this.updateStatus('✅ 数据已导出');
+      });
+    }
+
+    // 触发文件选择
+    if (importBtn && fileInput) {
+      importBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      // 处理导入文件
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const jsonData = JSON.parse(e.target.result);
+            const result = Storage.importData(jsonData);
+
+            if (result.success) {
+              // 重建数据
+              const data = Storage.initData();
+              this.subjects = data.subjects;
+              this.pointsMap = data.pointsMap;
+
+              // 刷新全部视图
+              this.renderTree();
+              this.renderDashboard();
+              this.updateGlobalStats();
+              if (this.currentTab === 'stats') this.renderStats();
+
+              this.updateStatus(`✅ 已导入 ${result.imported} 个知识点` + (result.skipped > 0 ? `，跳过 ${result.skipped} 个无效条目` : ''));
+            } else {
+              this.updateStatus(`❌ 导入失败：${result.error || '未知错误'}`);
+            }
+          } catch (err) {
+            this.updateStatus('❌ 文件格式错误，请选择有效的 JSON 文件');
+          }
+        };
+        reader.onerror = () => {
+          this.updateStatus('❌ 文件读取失败');
+        };
+        reader.readAsText(file);
+
+        // 重置 input，允许重复选择同一文件
+        fileInput.value = '';
+      });
+    }
   },
 
   /* ========== 仪表盘 ========== */
@@ -732,6 +869,9 @@ const App = {
       </div>
     </div>`;
 
+    // 复习热力图
+    html += this.renderHeatmap();
+
     // 各科进度
     html += `<div class="stats-section-title">各科学习进度</div>`;
     html += `<div class="stats-subjects">`;
@@ -762,6 +902,132 @@ const App = {
 
     html += `</div>`;
     container.innerHTML = html;
+  },
+
+  /* ========== 复习热力图 ========== */
+
+  /** 聚合所有知识点的复习历史，按日期计数 */
+  aggregateReviewByDate() {
+    const map = new Map();
+    Object.values(this.pointsMap).forEach(point => {
+      (point.reviewHistory || []).forEach(entry => {
+        const dateStr = entry.date.slice(0, 10); // "2026-06-01"
+        map.set(dateStr, (map.get(dateStr) || 0) + 1);
+      });
+    });
+    return map;
+  },
+
+  /** 渲染复习热力图（GitHub 风格） */
+  renderHeatmap() {
+    const dateMap = this.aggregateReviewByDate();
+    const totalReviews = Array.from(dateMap.values()).reduce((a, b) => a + b, 0);
+
+    // 空状态
+    if (totalReviews === 0) {
+      return `<div class="stats-section-title">复习热力图</div>
+        <div class="heatmap-empty">📅 还没有复习记录，去「仪表盘」开始复习吧</div>`;
+    }
+
+    // 计算日期范围：过去 20 周（周日起）
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay(); // 0=周日
+    const endDate = new Date(today);  // 包含今天
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - (dayOfWeek + 20 * 7 - 1)); // 20周前的周日
+
+    // 生成日期网格：按列（每周7行）
+    const weeks = [];
+    const d = new Date(startDate);
+    while (d <= endDate) {
+      weeks.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+
+    // 星期标签（只显示部分）
+    const weekdayLabels = ['日', '一', '', '三', '', '五', ''];
+
+    // 色阶函数
+    const getLevel = (count) => {
+      if (count === 0) return 0;
+      if (count <= 2) return 1;
+      if (count <= 5) return 2;
+      if (count <= 10) return 3;
+      return 4;
+    };
+
+    // 月份标签：找出每个月第一天所在的列索引
+    const monthLabels = [];
+    let lastMonth = -1;
+    weeks.forEach((date, idx) => {
+      const m = date.getMonth();
+      if (m !== lastMonth) {
+        const colIdx = Math.floor(idx / 7);
+        // 避免相邻月份标签重叠
+        const prev = monthLabels[monthLabels.length - 1];
+        if (!prev || colIdx - prev.colIdx >= 3) {
+          monthLabels.push({ label: `${date.getMonth() + 1}月`, colIdx });
+        }
+        lastMonth = m;
+      }
+    });
+
+    // 构建 HTML
+    let html = `<div class="stats-section-title">复习热力图</div>`;
+    html += `<div class="heatmap-wrapper">`;
+    html += `<div class="heatmap-body">`;
+
+    // 星期标签列
+    html += `<div class="heatmap-weekdays">`;
+    weekdayLabels.forEach(label => {
+      html += `<span class="heatmap-weekday">${label}</span>`;
+    });
+    html += `</div>`;
+
+    // 图表区
+    html += `<div class="heatmap-chart-area">`;
+
+    // 月份标签行
+    const totalCols = Math.ceil(weeks.length / 7);
+    html += `<div class="heatmap-months" style="width:${totalCols * 17}px;position:relative;">`;
+    monthLabels.forEach(m => {
+      html += `<span class="heatmap-month-label" style="left:${m.colIdx * 17}px;">${m.label}</span>`;
+    });
+    html += `</div>`;
+
+    // 格子网格
+    html += `<div class="heatmap-grid">`;
+    weeks.forEach(date => {
+      const dateStr = date.toISOString().slice(0, 10);
+      const count = dateMap.get(dateStr) || 0;
+      const level = getLevel(count);
+      const dayLabel = `${dateStr} · ${count} 次复习`;
+      html += `<span class="heatmap-cell l-${level}" data-tip="${dayLabel}" title="${dayLabel}"></span>`;
+    });
+    html += `</div>`;
+
+    // 图例
+    html += `<div class="heatmap-legend">
+      <span>少</span>
+      <span class="heatmap-legend-cell l-0"></span>
+      <span class="heatmap-legend-cell l-1"></span>
+      <span class="heatmap-legend-cell l-2"></span>
+      <span class="heatmap-legend-cell l-3"></span>
+      <span class="heatmap-legend-cell l-4"></span>
+      <span>多</span>
+    </div>`;
+
+    html += `</div>`; // chart-area
+    html += `</div>`; // heatmap-body
+    html += `</div>`; // heatmap-wrapper
+
+    // 总复习次数
+    html += `<div style="text-align:center;font-size:12px;color:var(--color-text-secondary);margin-top:4px;">`;
+    html += `共 ${totalReviews} 次复习记录`;
+    html += `</div>`;
+
+    return html;
   },
 
   updateGlobalStats() {

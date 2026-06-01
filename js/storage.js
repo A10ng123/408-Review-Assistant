@@ -128,6 +128,57 @@ const Storage = {
     URL.revokeObjectURL(url);
   },
 
+  /** 导入用户数据：校验 JSON 并合并到 localStorage */
+  importData(jsonData) {
+    // 校验：顶层必须是对象
+    if (!jsonData || typeof jsonData !== 'object' || Array.isArray(jsonData)) {
+      return { success: false, imported: 0, skipped: 0, error: '数据格式错误：需要 JSON 对象' };
+    }
+
+    let imported = 0;
+    let skipped = 0;
+
+    // 加载现有本地数据
+    const existing = this.loadUserData();
+
+    // 遍历导入的数据
+    Object.entries(jsonData).forEach(([key, entry]) => {
+      // 校验：每条记录必须包含必要字段
+      if (!entry || typeof entry !== 'object') {
+        skipped++;
+        return;
+      }
+      if (typeof entry.mastery !== 'number' || !entry.sm2 || typeof entry.sm2 !== 'object') {
+        skipped++;
+        return;
+      }
+
+      // 合并：导入数据覆盖本地已有，保留本地独有的
+      existing[key] = {
+        mastery: entry.mastery,
+        description: entry.description || '',
+        sm2: {
+          interval: entry.sm2.interval || 1,
+          repetitions: entry.sm2.repetitions || 0,
+          easeFactor: entry.sm2.easeFactor || 2.5,
+          nextReview: entry.sm2.nextReview || null,
+          lastReview: entry.sm2.lastReview || null
+        },
+        reviewHistory: Array.isArray(entry.reviewHistory) ? entry.reviewHistory : []
+      };
+      imported++;
+    });
+
+    // 保存合并后的数据
+    try {
+      localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(existing));
+    } catch (e) {
+      return { success: false, imported: 0, skipped: 0, error: '存储空间不足' };
+    }
+
+    return { success: true, imported, skipped };
+  },
+
   /** 获取总知识点数量统计 */
   getStats(pointsMap) {
     const total = Object.keys(pointsMap).length;

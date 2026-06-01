@@ -16,6 +16,7 @@
       <button class="topnav-tab" data-tab="stats">统计</button>
       <button class="topnav-tab" data-tab="mindmap">思维导图</button>
     </nav>
+    <button id="theme-toggle" class="theme-toggle" title="切换深色模式">🌙</button>
   </header>
 
   <!-- 视图容器 -->
@@ -83,6 +84,13 @@
       </div>
     </section>
   </main>
+
+  <!-- 数据导入导出工具栏 -->
+  <div class="data-toolbar">
+    <button id="btn-export" class="data-tool-btn">📥 导出数据</button>
+    <button id="btn-import" class="data-tool-btn">📤 导入数据</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
 
   <!-- 底部状态栏 -->
   <footer class="statusbar">
