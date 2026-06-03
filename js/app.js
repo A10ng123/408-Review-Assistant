@@ -328,6 +328,11 @@ const App = {
     // 概述区
     const summaryEl = document.getElementById('dash-summary');
     if (summaryEl) {
+      const streaks = this.calculateStreaks();
+      const dailyGoal = this.getDailyGoal();
+      const todayCount = streaks.todayCount;
+      const goalPct = dailyGoal > 0 ? Math.min(100, Math.round((todayCount / dailyGoal) * 100)) : 0;
+
       summaryEl.innerHTML = `
         <div class="dash-stat">
           <div class="stat-num urgent">${urgentCount}</div>
@@ -341,7 +346,27 @@ const App = {
           <div class="stat-num normal">${reviewedCount}</div>
           <div class="stat-label">已学习知识点</div>
         </div>
+        <div class="streak-card">
+          <div class="streak-header">🔥 连续打卡</div>
+          <div class="streak-num ${streaks.current === 0 ? 'zero' : ''}">${streaks.current}</div>
+          <div class="streak-label">天</div>
+          <div class="streak-meta">最长连续 ${streaks.longest} 天</div>
+          <div class="streak-goal">
+            <div class="streak-goal-label">
+              今日目标
+              <span class="streak-goal-edit" id="goal-edit-btn" title="点击修改目标">
+                ${todayCount}/${dailyGoal}
+              </span>
+            </div>
+            <div class="goal-progress-bar">
+              <div class="goal-progress-fill ${todayCount > dailyGoal ? 'over-goal' : ''}" style="width:${goalPct}%"></div>
+            </div>
+          </div>
+        </div>
       `;
+
+      // 绑定目标编辑事件
+      setTimeout(() => this.bindGoalEdit(dailyGoal), 0);
     }
 
     // 复习队列
@@ -916,6 +941,114 @@ const App = {
       });
     });
     return map;
+  },
+
+  /** 计算连续打卡天数 */
+  calculateStreaks() {
+    const dateMap = this.aggregateReviewByDate();
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const todayCount = dateMap.get(todayStr) || 0;
+
+    // 收集所有有复习的日期，按降序排列
+    const reviewDates = Array.from(dateMap.keys()).sort().reverse();
+    if (reviewDates.length === 0) {
+      return { current: 0, longest: 0, todayCount: 0 };
+    }
+
+    // 计算当前连续：从今天往回数
+    let currentStreak = 0;
+    const checkDate = new Date(today);
+    // 如果今天还没有复习，从昨天开始检查（连续还没断）
+    if (todayCount === 0) {
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    while (true) {
+      const ds = checkDate.toISOString().slice(0, 10);
+      if (dateMap.has(ds)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    // 计算最长连续
+    let longestStreak = 0;
+    let tempStreak = 0;
+    const sortedDates = Array.from(dateMap.keys()).sort(); // 升序
+    for (let i = 0; i < sortedDates.length; i++) {
+      if (i === 0) {
+        tempStreak = 1;
+      } else {
+        const prevDate = new Date(sortedDates[i - 1]);
+        const currDate = new Date(sortedDates[i]);
+        const diffDays = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      }
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+    }
+
+    return { current: currentStreak, longest: longestStreak, todayCount };
+  },
+
+  /** 获取每日复习目标（默认 20） */
+  getDailyGoal() {
+    try {
+      const raw = localStorage.getItem(Storage.SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      return settings.dailyGoal || 20;
+    } catch (e) { return 20; }
+  },
+
+  /** 保存每日复习目标 */
+  saveDailyGoal(goal) {
+    try {
+      const raw = localStorage.getItem(Storage.SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      settings.dailyGoal = goal;
+      localStorage.setItem(Storage.SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) { console.warn('保存每日目标失败', e); }
+  },
+
+  /** 绑定每日目标编辑事件 */
+  bindGoalEdit(currentGoal) {
+    const editBtn = document.getElementById('goal-edit-btn');
+    if (!editBtn) return;
+
+    editBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'streak-goal-input';
+      input.value = currentGoal;
+      input.min = 1;
+      input.max = 200;
+      editBtn.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const save = () => {
+        const newGoal = parseInt(input.value) || currentGoal;
+        const finalGoal = Math.max(1, Math.min(200, newGoal));
+        this.saveDailyGoal(finalGoal);
+        this.renderDashboard();
+      };
+
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { input.blur(); }
+        if (e.key === 'Escape') {
+          input.value = currentGoal;
+          input.blur();
+        }
+      });
+    });
   },
 
   /** 渲染复习热力图（GitHub 风格） */
