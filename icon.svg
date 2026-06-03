@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 书本形状 -->
+  <rect x="100" y="80" width="312" height="360" rx="16" ry="16" fill="#4A90D9"/>
+  <rect x="116" y="96" width="280" height="280" rx="8" ry="8" fill="#FAFBFC"/>
+  <!-- 书脊线 -->
+  <line x1="256" y1="96" x2="256" y2="376" stroke="#4A90D9" stroke-width="2" opacity="0.3"/>
+  <!-- 408 文字 -->
+  <text x="256" y="280" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#4A90D9" text-anchor="middle" dominant-baseline="middle">408</text>
+  <!-- 书签 -->
+  <polygon points="196,96 240,96 240,160 218,140 196,160" fill="#F5A623"/>
+</svg>
